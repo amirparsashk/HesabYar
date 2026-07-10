@@ -8,25 +8,41 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.hesabyar.ui.theme.HesabYarTheme
+import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionDetailScreen(
+    transactionId: Long,
+    viewModel: TransactionDetailViewModel,
     onBack: () -> Unit,
-    onEdit: () -> Unit = {},
-    onDelete: () -> Unit = {}
+    onEdit: (Long) -> Unit = {}
 ) {
+    val state by viewModel.state.collectAsState()
+
+    LaunchedEffect(transactionId) {
+        viewModel.handleIntent(TransactionDetailContract.Intent.LoadTransaction(transactionId))
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is TransactionDetailContract.Effect.NavigateBack -> onBack()
+                is TransactionDetailContract.Effect.ShowError -> {
+                    // Show error
+                }
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -63,20 +79,31 @@ fun TransactionDetailScreen(
         },
         containerColor = Color(0xFFF3FAFF)
     ) { paddingValues ->
-        TransactionDetailContent(
-            paddingValues = paddingValues,
-            onEdit = onEdit,
-            onDelete = onDelete
-        )
+        if (state.isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else if (state.transaction != null) {
+            TransactionDetailContent(
+                state = state,
+                paddingValues = paddingValues,
+                onEdit = { onEdit(transactionId) },
+                onDelete = { viewModel.handleIntent(TransactionDetailContract.Intent.DeleteTransaction) }
+            )
+        }
     }
 }
 
 @Composable
 fun TransactionDetailContent(
+    state: TransactionDetailContract.State,
     paddingValues: PaddingValues,
     onEdit: () -> Unit = {},
     onDelete: () -> Unit = {}
 ) {
+    val transaction = state.transaction!!
+    val isExpense = transaction.type == "Expense"
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -101,11 +128,11 @@ fun TransactionDetailContent(
                 // Category Icon
                 Surface(
                     modifier = Modifier.size(80.dp),
-                    color = Color(0xFFABF4AC),
+                    color = if (isExpense) Color(0xFFABF4AC) else Color(0xFFCCEACD),
                     shape = CircleShape
                 ) {
                     Icon(
-                        Icons.Default.ShoppingBasket,
+                        if (isExpense) Icons.Default.ShoppingBasket else Icons.Default.Payments,
                         contentDescription = null,
                         modifier = Modifier.padding(20.dp),
                         tint = Color(0xFF0D631B)
@@ -115,7 +142,7 @@ fun TransactionDetailContent(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    text = "Grocery Shopping",
+                    text = transaction.title,
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF071E27)
@@ -129,7 +156,7 @@ fun TransactionDetailContent(
                     border = BorderStroke(1.dp, Color(0xFF0D631B).copy(alpha = 0.2f))
                 ) {
                     Text(
-                        text = "FOOD & DINING",
+                        text = state.category?.name ?: "UNCATEGORIZED",
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
@@ -140,14 +167,14 @@ fun TransactionDetailContent(
                 Spacer(modifier = Modifier.height(24.dp))
                 
                 Text(
-                    text = "$120.50",
+                    text = (if (isExpense) "-" else "+") + "$${transaction.amount}",
                     style = MaterialTheme.typography.displayMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0D631B)
+                    color = if (isExpense) Color(0xFFBA1A1A) else Color(0xFF0D631B)
                 )
                 
                 Text(
-                    text = "Today • 14:32 PM",
+                    text = Date(transaction.date).toString(),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color(0xFF40493D)
                 )
@@ -161,15 +188,15 @@ fun TransactionDetailContent(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     DetailItem(
-                        label = "PAID FROM",
-                        value = "Main Wallet",
-                        icon = Icons.Default.AccountBalanceWallet,
+                        label = "TYPE",
+                        value = transaction.type,
+                        icon = Icons.Default.Info,
                         modifier = Modifier.weight(1f)
                     )
                     DetailItem(
-                        label = "MERCHANT",
-                        value = "Whole Foods",
-                        icon = Icons.Default.Storefront,
+                        label = "ID",
+                        value = "#${transaction.id}",
+                        icon = Icons.Default.Fingerprint,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -177,59 +204,26 @@ fun TransactionDetailContent(
         }
         
         // Memo Section
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = Color(0xFFDBF1FE).copy(alpha = 0.5f),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, Color(0xFFDBF1FE))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    "MEMO",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF40493D),
-                    letterSpacing = 1.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "Weekly grocery shopping for the family. Focus on organic products and fresh fruits.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF071E27)
-                )
-            }
-        }
-        
-        // Attached Receipt
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                "ATTACHED RECEIPT",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF40493D),
-                letterSpacing = 1.sp
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+        if (!transaction.note.isNullOrBlank()) {
             Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp),
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFFDBF1FE).copy(alpha = 0.5f),
                 shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, Color(0xFFDBF1FE)),
-                color = Color(0xFFE6F6FF)
+                border = BorderStroke(1.dp, Color(0xFFDBF1FE))
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Default.Image,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = Color(0xFF0D631B).copy(alpha = 0.3f)
-                    )
+                Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "Tap to view receipt",
-                        modifier = Modifier.padding(top = 64.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF0D631B).copy(alpha = 0.5f)
+                        "MEMO",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF40493D),
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        transaction.note,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF071E27)
                     )
                 }
             }
@@ -316,13 +310,5 @@ fun DetailItem(
                 color = Color(0xFF071E27)
             )
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun TransactionDetailScreenPreview() {
-    HesabYarTheme {
-        TransactionDetailScreen(onBack = {})
     }
 }

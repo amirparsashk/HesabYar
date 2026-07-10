@@ -9,6 +9,8 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -16,20 +18,22 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.hesabyar.ui.components.MainScaffold
-import com.example.hesabyar.ui.theme.HesabYarTheme
+import java.util.Date
 
 @Composable
 fun DashboardScreen(
+    viewModel: DashboardViewModel,
     onAddTransaction: () -> Unit = {},
     onNavigateToStats: () -> Unit = {},
     onNavigateToHistory: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
-    onTransactionClick: () -> Unit = {}
+    onTransactionClick: (Long) -> Unit = {}
 ) {
+    val state by viewModel.state.collectAsState()
+
     MainScaffold(
         currentScreen = "dashboard",
         onDashboardClick = { /* Already here */ },
@@ -38,19 +42,27 @@ fun DashboardScreen(
         onProfileClick = onNavigateToProfile,
         onAddTransactionClick = onAddTransaction
     ) { paddingValues ->
-        DashboardContent(
-            paddingValues = paddingValues,
-            onAddTransaction = onAddTransaction,
-            onTransactionClick = onTransactionClick
-        )
+        if (state.isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else {
+            DashboardContent(
+                state = state,
+                paddingValues = paddingValues,
+                onAddTransaction = onAddTransaction,
+                onTransactionClick = onTransactionClick
+            )
+        }
     }
 }
 
 @Composable
 fun DashboardContent(
+    state: DashboardContract.State,
     paddingValues: PaddingValues,
     onAddTransaction: () -> Unit = {},
-    onTransactionClick: () -> Unit = {}
+    onTransactionClick: (Long) -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -61,7 +73,7 @@ fun DashboardContent(
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         // Balance Card
-        BalanceCard()
+        BalanceCard(state.balance)
 
         // Stats Row
         Row(
@@ -70,14 +82,14 @@ fun DashboardContent(
         ) {
             StatItem(
                 title = "Total Income",
-                amount = "$12,450",
+                amount = "$${state.totalIncome}",
                 icon = Icons.Default.ArrowDownward,
                 iconColor = Color(0xFF286B33),
                 modifier = Modifier.weight(1f)
             )
             StatItem(
                 title = "Total Expenses",
-                amount = "$8,120",
+                amount = "$${state.totalExpense}",
                 icon = Icons.Default.ArrowUpward,
                 iconColor = Color(0xFFBA1A1A),
                 modifier = Modifier.weight(1f),
@@ -135,48 +147,32 @@ fun DashboardContent(
                 )
             }
 
-            TransactionItem(
-                title = "Grocery Store",
-                date = "Today, 2:45 PM",
-                amount = "-$120.50",
-                icon = Icons.Default.ShoppingCart,
-                iconContainerColor = Color(0xFFABF4AC),
-                isExpense = true,
-                onClick = onTransactionClick
-            )
-            TransactionItem(
-                title = "Freelance Salary",
-                date = "Yesterday, 10:15 AM",
-                amount = "+$2,400.00",
-                icon = Icons.Default.Payments,
-                iconContainerColor = Color(0xFFCCEACD),
-                isExpense = false,
-                onClick = onTransactionClick
-            )
-            TransactionItem(
-                title = "Dinner Out",
-                date = "Oct 24, 8:30 PM",
-                amount = "-$85.00",
-                icon = Icons.Default.Restaurant,
-                iconContainerColor = Color(0xFFCFE6F2),
-                isExpense = true,
-                onClick = onTransactionClick
-            )
-            TransactionItem(
-                title = "Electricity Bill",
-                date = "Oct 22, 11:00 AM",
-                amount = "-$142.20",
-                icon = Icons.Default.Bolt,
-                iconContainerColor = Color(0xFF88D982),
-                isExpense = true,
-                onClick = onTransactionClick
-            )
+            if (state.recentTransactions.isEmpty()) {
+                Text(
+                    "No transactions yet.",
+                    modifier = Modifier.padding(vertical = 16.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                state.recentTransactions.forEach { transaction ->
+                    TransactionItem(
+                        title = transaction.title,
+                        date = Date(transaction.date).toString(), // Should use a proper formatter
+                        amount = (if (transaction.type == "Expense") "-" else "+") + "$${transaction.amount}",
+                        icon = if (transaction.type == "Expense") Icons.Default.ShoppingCart else Icons.Default.Payments,
+                        iconContainerColor = if (transaction.type == "Expense") Color(0xFFABF4AC) else Color(0xFFCCEACD),
+                        isExpense = transaction.type == "Expense",
+                        onClick = { onTransactionClick(transaction.id) }
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-fun BalanceCard() {
+fun BalanceCard(balance: Double) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -202,7 +198,7 @@ fun BalanceCard() {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "$42,500.00",
+                    "$${balance}",
                     style = MaterialTheme.typography.displayMedium,
                     color = Color.White,
                     fontWeight = FontWeight.Bold
@@ -334,13 +330,5 @@ fun TransactionItem(
                 color = if (isExpense) Color(0xFFBA1A1A) else Color(0xFF286B33)
             )
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun DashboardScreenPreview() {
-    HesabYarTheme {
-        DashboardScreen()
     }
 }

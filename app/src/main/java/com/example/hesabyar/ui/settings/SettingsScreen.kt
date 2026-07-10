@@ -12,21 +12,29 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.hesabyar.ui.theme.HesabYarTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    viewModel: SettingsViewModel,
     onBack: () -> Unit,
     onLogoutClick: () -> Unit
 ) {
+    val state by viewModel.state.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is SettingsContract.Effect.NavigateToLogin -> onLogoutClick()
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -55,16 +63,18 @@ fun SettingsScreen(
         containerColor = Color(0xFFF3FAFF)
     ) { paddingValues ->
         SettingsContent(
-            paddingValues = paddingValues,
-            onLogoutClick = onLogoutClick
+            state = state,
+            onIntent = { viewModel.handleIntent(it) },
+            paddingValues = paddingValues
         )
     }
 }
 
 @Composable
 fun SettingsContent(
-    paddingValues: PaddingValues,
-    onLogoutClick: () -> Unit
+    state: SettingsContract.State,
+    onIntent: (SettingsContract.Intent) -> Unit,
+    paddingValues: PaddingValues
 ) {
     Column(
         modifier = Modifier
@@ -75,12 +85,12 @@ fun SettingsContent(
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         // Profile Header Section
-        ProfileHeaderSection()
+        ProfileHeaderSection(state.userName, state.userEmail)
 
         // Main Settings sections
-        AppearanceSection()
-        SecuritySection()
-        AboutSection(onLogoutClick = onLogoutClick)
+        AppearanceSection(state.isDarkMode) { onIntent(SettingsContract.Intent.DarkModeChanged(it)) }
+        SecuritySection(state.isNotificationsEnabled) { onIntent(SettingsContract.Intent.NotificationsChanged(it)) }
+        AboutSection(onLogoutClick = { onIntent(SettingsContract.Intent.Logout) })
 
         // Illustration/Footer
         FooterSection()
@@ -88,7 +98,7 @@ fun SettingsContent(
 }
 
 @Composable
-private fun ProfileHeaderSection() {
+private fun ProfileHeaderSection(name: String, email: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -134,13 +144,13 @@ private fun ProfileHeaderSection() {
                 }
                 Column {
                     Text(
-                        "Rachel Wong",
+                        name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF071E27)
                     )
                     Text(
-                        "rachelwong@gmail.com",
+                        email,
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFF40493D)
                     )
@@ -184,9 +194,7 @@ private fun ProfileHeaderSection() {
 }
 
 @Composable
-private fun AppearanceSection() {
-    var darkMode by remember { mutableStateOf(false) }
-    
+private fun AppearanceSection(isDarkMode: Boolean, onDarkModeChange: (Boolean) -> Unit) {
     SettingsCard(
         title = "Appearance",
         icon = Icons.Default.Palette
@@ -201,8 +209,8 @@ private fun AppearanceSection() {
                 Text("Switch to a darker interface", style = MaterialTheme.typography.labelSmall, color = Color(0xFF40493D))
             }
             Switch(
-                checked = darkMode,
-                onCheckedChange = { darkMode = it },
+                checked = isDarkMode,
+                onCheckedChange = onDarkModeChange,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = Color.White,
                     checkedTrackColor = Color(0xFF0D631B),
@@ -234,9 +242,7 @@ private fun AppearanceSection() {
 }
 
 @Composable
-private fun SecuritySection() {
-    var notifications by remember { mutableStateOf(true) }
-    
+private fun SecuritySection(isNotificationsEnabled: Boolean, onNotificationsChange: (Boolean) -> Unit) {
     SettingsCard(
         title = "Security",
         icon = Icons.Default.Security
@@ -251,8 +257,8 @@ private fun SecuritySection() {
                 Text("Alerts for low balance & limits", style = MaterialTheme.typography.labelSmall, color = Color(0xFF40493D))
             }
             Switch(
-                checked = notifications,
-                onCheckedChange = { notifications = it },
+                checked = isNotificationsEnabled,
+                onCheckedChange = onNotificationsChange,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = Color.White,
                     checkedTrackColor = Color(0xFF0D631B)
@@ -427,13 +433,5 @@ private fun AboutSmallButton(icon: ImageVector, label: String, modifier: Modifie
             Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF0D631B))
             Text(label, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun SettingsScreenPreview() {
-    HesabYarTheme {
-        SettingsScreen(onBack = {}, onLogoutClick = {})
     }
 }

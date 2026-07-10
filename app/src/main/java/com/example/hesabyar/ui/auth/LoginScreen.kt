@@ -1,7 +1,6 @@
 package com.example.hesabyar.ui.auth
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -20,20 +19,33 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.hesabyar.ui.theme.HesabYarTheme
 
 @Composable
-fun LoginScreen(onSignUpClick: () -> Unit, onLoginSuccess: () -> Unit) {
+fun LoginScreen(
+    viewModel: LoginViewModel,
+    onSignUpClick: () -> Unit,
+    onLoginSuccess: () -> Unit
+) {
+    val state by viewModel.state.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is LoginContract.Effect.NavigateToDashboard -> onLoginSuccess()
+                is LoginContract.Effect.ShowError -> {
+                    // Show error (could use a Snackbar or Toast)
+                }
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -73,7 +85,7 @@ fun LoginScreen(onSignUpClick: () -> Unit, onLoginSuccess: () -> Unit) {
                     .wrapContentHeight()
                     .padding(vertical = 32.dp),
                 shape = RoundedCornerShape(16.dp),
-                color = Color.White, // Surface container lowest
+                color = Color.White,
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
                 shadowElevation = 2.dp
             ) {
@@ -113,13 +125,9 @@ fun LoginScreen(onSignUpClick: () -> Unit, onLoginSuccess: () -> Unit) {
                     Spacer(modifier = Modifier.height(32.dp))
 
                     // Login Form
-                    var email by remember { mutableStateOf("") }
-                    var password by remember { mutableStateOf("") }
-                    var passwordVisible by remember { mutableStateOf(false) }
-
                     OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it },
+                        value = state.email,
+                        onValueChange = { viewModel.handleIntent(LoginContract.Intent.EmailChanged(it)) },
                         label = { Text("Email Address") },
                         placeholder = { Text("name@example.com") },
                         modifier = Modifier.fillMaxWidth(),
@@ -134,8 +142,8 @@ fun LoginScreen(onSignUpClick: () -> Unit, onLoginSuccess: () -> Unit) {
                     Spacer(modifier = Modifier.height(16.dp))
 
                     OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
+                        value = state.password,
+                        onValueChange = { viewModel.handleIntent(LoginContract.Intent.PasswordChanged(it)) },
                         label = { Text("Password") },
                         placeholder = { Text("••••••••") },
                         modifier = Modifier.fillMaxWidth(),
@@ -143,15 +151,15 @@ fun LoginScreen(onSignUpClick: () -> Unit, onLoginSuccess: () -> Unit) {
                             Icon(Icons.Default.Lock, contentDescription = null)
                         },
                         trailingIcon = {
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            IconButton(onClick = { viewModel.handleIntent(LoginContract.Intent.TogglePasswordVisibility) }) {
                                 Icon(
-                                    imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    imageVector = if (state.isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                                     contentDescription = null
                                 )
                             }
                         },
                         shape = RoundedCornerShape(8.dp),
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        visualTransformation = if (state.isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         singleLine = true
                     )
@@ -170,26 +178,31 @@ fun LoginScreen(onSignUpClick: () -> Unit, onLoginSuccess: () -> Unit) {
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Button(
-                        onClick = { onLoginSuccess() },
+                        onClick = { viewModel.handleIntent(LoginContract.Intent.LoginClicked) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
+                        enabled = !state.isLoading,
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         )
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = "Login",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Icon(Icons.AutoMirrored.Filled.Login, contentDescription = null)
+                        if (state.isLoading) {
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
+                        } else {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = "Login",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(Icons.AutoMirrored.Filled.Login, contentDescription = null)
+                            }
                         }
                     }
 
@@ -219,12 +232,12 @@ fun LoginScreen(onSignUpClick: () -> Unit, onLoginSuccess: () -> Unit) {
                     ) {
                         SocialButton(
                             text = "Google",
-                            icon = Icons.Default.GTranslate, // Placeholder for Google icon
+                            icon = Icons.Default.GTranslate,
                             modifier = Modifier.weight(1f)
                         )
                         SocialButton(
                             text = "Facebook",
-                            icon = Icons.Default.Face, // Placeholder for Facebook icon
+                            icon = Icons.Default.Face,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -287,13 +300,5 @@ fun SocialButton(
             Spacer(modifier = Modifier.width(8.dp))
             Text(text = text, style = MaterialTheme.typography.labelLarge)
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun LoginScreenPreview() {
-    HesabYarTheme {
-        LoginScreen(onSignUpClick = {}, onLoginSuccess = {})
     }
 }

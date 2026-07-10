@@ -8,6 +8,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -16,19 +18,20 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.hesabyar.ui.components.MainScaffold
-import com.example.hesabyar.ui.theme.HesabYarTheme
 
 @Composable
 fun StatsScreen(
+    viewModel: StatsViewModel,
     onDashboardClick: () -> Unit = {},
     onHistoryClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onAddTransaction: () -> Unit = {}
 ) {
+    val state by viewModel.state.collectAsState()
+
     MainScaffold(
         currentScreen = "stats",
         onDashboardClick = onDashboardClick,
@@ -37,12 +40,18 @@ fun StatsScreen(
         onProfileClick = onProfileClick,
         onAddTransactionClick = onAddTransaction
     ) { paddingValues ->
-        StatsContent(paddingValues = paddingValues)
+        if (state.isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else {
+            StatsContent(state = state, paddingValues = paddingValues)
+        }
     }
 }
 
 @Composable
-fun StatsContent(paddingValues: PaddingValues) {
+fun StatsContent(state: StatsContract.State, paddingValues: PaddingValues) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -54,13 +63,13 @@ fun StatsContent(paddingValues: PaddingValues) {
         // Hero Stats Intro
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                "Insights for May",
+                "Financial Insights",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF0D631B)
             )
             Text(
-                "You've managed your budget exceptionally well this month. Your savings rate is up by 12% compared to April.",
+                "Here is a summary of your financial activity based on your transactions.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -73,19 +82,19 @@ fun StatsContent(paddingValues: PaddingValues) {
         ) {
             SummaryCard(
                 title = "INCOME",
-                amount = "$4,820",
+                amount = "$${state.totalIncome}",
                 amountColor = Color(0xFF2E7D32),
                 modifier = Modifier.weight(1f)
             )
             SummaryCard(
                 title = "SPENT",
-                amount = "$1,450",
+                amount = "$${state.totalExpense}",
                 amountColor = Color(0xFFBA1A1A),
                 modifier = Modifier.weight(1f)
             )
         }
 
-        // Donut Chart placeholder
+        // Donut Chart
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -94,24 +103,14 @@ fun StatsContent(paddingValues: PaddingValues) {
         ) {
             DonutChart(
                 modifier = Modifier.size(160.dp),
-                progress = 0.6f,
-                centerText = "$1,450.20",
+                progress = 1f, // Simplified
+                centerText = "$${state.totalExpense}",
                 label = "TOTAL SPENT"
             )
         }
 
-        // Bento Grid: Monthly Comparison
-        MonthlyComparisonCard()
-
-        // Bento Grid: Savings Goal
-        SavingsGoalCard(
-            title = "Bali Trip",
-            current = 2400f,
-            target = 3000f
-        )
-
         // Category Breakdown
-        CategoryBreakdown()
+        CategoryBreakdown(state.categoryBreakdown)
     }
 }
 
@@ -168,13 +167,6 @@ fun DonutChart(
                 useCenter = false,
                 style = Stroke(width = 40f, cap = StrokeCap.Round)
             )
-            drawArc(
-                color = Color(0xFFFFB300),
-                startAngle = -90f + (360 * progress),
-                sweepAngle = 40f,
-                useCenter = false,
-                style = Stroke(width = 40f, cap = StrokeCap.Round)
-            )
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
@@ -192,112 +184,22 @@ fun DonutChart(
 }
 
 @Composable
-fun MonthlyComparisonCard() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color(0xFFE6F6FF),
-        shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, Color(0xFFCFE6F2))
-    ) {
-        Column(modifier = Modifier.padding(24.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Monthly Comparison", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color(0xFF0D631B)))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Income", style = MaterialTheme.typography.labelSmall)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color(0xFFABF4AC)))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Expense", style = MaterialTheme.typography.labelSmall)
-                }
-            }
-            Spacer(modifier = Modifier.height(24.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth().height(150.dp),
-                horizontalArrangement = Arrangement.SpaceAround,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                BarGroup("MAR", 0.6f, 0.4f)
-                BarGroup("APR", 0.8f, 0.5f)
-                BarGroup("MAY", 1.0f, 0.3f, isHighlighted = true)
-                BarGroup("JUN", 0.7f, 0.2f, isAlpha = true)
-            }
-        }
-    }
-}
-
-@Composable
-fun BarGroup(label: String, incomeHeight: Float, expenseHeight: Float, isHighlighted: Boolean = false, isAlpha: Boolean = false) {
-    val alpha = if (isAlpha) 0.3f else 1f
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Box(
-                modifier = Modifier
-                    .width(12.dp)
-                    .fillMaxHeight(incomeHeight)
-                    .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                    .background(Color(0xFF0D631B).copy(alpha = alpha))
-            )
-            Box(
-                modifier = Modifier
-                    .width(12.dp)
-                    .fillMaxHeight(expenseHeight)
-                    .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                    .background(Color(0xFFABF4AC).copy(alpha = alpha))
-            )
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Normal,
-            color = if (isHighlighted) Color(0xFF0D631B) else MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-fun SavingsGoalCard(title: String, current: Float, target: Float) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color(0xFF0D631B),
-        shape = RoundedCornerShape(24.dp)
-    ) {
-        Column(modifier = Modifier.padding(24.dp)) {
-            Text(title, style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold)
-            Text("SAVINGS GOAL", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text("$${current.toInt()}", style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.Bold)
-                Text(" / $${target.toInt()}", style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.8f))
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            val progress = current / target
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
-                color = Color(0xFFABF4AC),
-                trackColor = Color.White.copy(alpha = 0.2f),
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("${(progress * 100).toInt()}% reached", style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-fun CategoryBreakdown() {
+fun CategoryBreakdown(breakdown: List<StatsContract.CategoryStat>) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Category Breakdown", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        CategoryItem("Food & Drinks", "$450.00", 0.84f, "$500", Icons.Default.Restaurant)
-        CategoryItem("Shopping", "$280.45", 0.41f, "$700", Icons.Default.ShoppingBag)
-        CategoryItem("Transport", "$120.00", 0.60f, "$200", Icons.Default.DirectionsCar)
-        CategoryItem("Housing", "$950.00", 0.95f, "$1000", Icons.Default.Home)
+        if (breakdown.isEmpty()) {
+            Text("No expense data available.")
+        } else {
+            breakdown.forEach { item ->
+                CategoryItem(
+                    name = item.categoryName,
+                    amount = "$${item.amount}",
+                    progress = item.percentage,
+                    limit = "$${item.limit}",
+                    icon = Icons.Default.Category
+                )
+            }
+        }
     }
 }
 
@@ -340,13 +242,5 @@ fun CategoryItem(name: String, amount: String, progress: Float, limit: String, i
                 }
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun StatsScreenPreview() {
-    HesabYarTheme {
-        StatsScreen()
     }
 }

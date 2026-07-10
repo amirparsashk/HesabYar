@@ -18,14 +18,28 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.hesabyar.ui.theme.HesabYarTheme
 
 @Composable
-fun SignUpScreen(onLoginClick: () -> Unit, onSignUpSuccess: () -> Unit) {
-    // Using MaterialTheme color scheme for consistency
+fun SignUpScreen(
+    viewModel: SignUpViewModel,
+    onLoginClick: () -> Unit,
+    onSignUpSuccess: () -> Unit
+) {
+    val state by viewModel.state.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is SignUpContract.Effect.NavigateToDashboard -> onSignUpSuccess()
+                is SignUpContract.Effect.ShowError -> {
+                    // Show error
+                }
+            }
+        }
+    }
+
     val primaryColor = MaterialTheme.colorScheme.primary
     val backgroundColor = MaterialTheme.colorScheme.background
     val inputFieldColor = Color.White
@@ -33,13 +47,7 @@ fun SignUpScreen(onLoginClick: () -> Unit, onSignUpSuccess: () -> Unit) {
     val onPrimaryContainerColor = MaterialTheme.colorScheme.onPrimaryContainer
     val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
 
-    var fullName by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
-
     Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
-        // Floating Background Element (Subtle Decoration)
         Box(
             modifier = Modifier
                 .size(384.dp)
@@ -60,7 +68,6 @@ fun SignUpScreen(onLoginClick: () -> Unit, onSignUpSuccess: () -> Unit) {
                     .padding(horizontal = 24.dp, vertical = 48.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header
                 Text(
                     text = "HesabYar",
                     style = MaterialTheme.typography.displayMedium,
@@ -69,20 +76,17 @@ fun SignUpScreen(onLoginClick: () -> Unit, onSignUpSuccess: () -> Unit) {
                     modifier = Modifier.padding(bottom = 20.dp)
                 )
 
-                // Illustration Placeholder (Coin + Character)
                 Box(
                     modifier = Modifier
                         .size(240.dp)
                         .padding(bottom = 32.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Background shape
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(primaryContainerColor.copy(alpha = 0.2f), CircleShape)
                     )
-                    // Placeholder for the illustration
                     Icon(
                         imageVector = Icons.Default.AccountBalanceWallet,
                         contentDescription = null,
@@ -91,7 +95,6 @@ fun SignUpScreen(onLoginClick: () -> Unit, onSignUpSuccess: () -> Unit) {
                     )
                 }
 
-                // Title and Subtitle
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.Start
@@ -110,39 +113,35 @@ fun SignUpScreen(onLoginClick: () -> Unit, onSignUpSuccess: () -> Unit) {
                     )
                 }
 
-                // Form
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    // Full Name
                     SignUpInputField(
                         label = "FULL NAME",
-                        value = fullName,
-                        onValueChange = { fullName = it },
+                        value = state.name,
+                        onValueChange = { viewModel.handleIntent(SignUpContract.Intent.NameChanged(it)) },
                         placeholder = "Sam Wilson",
                         backgroundColor = inputFieldColor
                     )
 
-                    // Email
                     SignUpInputField(
                         label = "EMAIL ADDRESS",
-                        value = email,
-                        onValueChange = { email = it },
+                        value = state.email,
+                        onValueChange = { viewModel.handleIntent(SignUpContract.Intent.EmailChanged(it)) },
                         placeholder = "sam@example.com",
                         keyboardType = KeyboardType.Email,
                         backgroundColor = inputFieldColor
                     )
 
-                    // Password Fields
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         SignUpInputField(
                             label = "PASSWORD",
-                            value = password,
-                            onValueChange = { password = it },
+                            value = state.password,
+                            onValueChange = { viewModel.handleIntent(SignUpContract.Intent.PasswordChanged(it)) },
                             placeholder = "••••••••",
                             modifier = Modifier.weight(1f),
                             visualTransformation = PasswordVisualTransformation(),
@@ -151,8 +150,8 @@ fun SignUpScreen(onLoginClick: () -> Unit, onSignUpSuccess: () -> Unit) {
                         )
                         SignUpInputField(
                             label = "CONFIRM",
-                            value = confirmPassword,
-                            onValueChange = { confirmPassword = it },
+                            value = state.confirmPassword,
+                            onValueChange = { viewModel.handleIntent(SignUpContract.Intent.ConfirmPasswordChanged(it)) },
                             placeholder = "••••••••",
                             modifier = Modifier.weight(1f),
                             visualTransformation = PasswordVisualTransformation(),
@@ -161,28 +160,31 @@ fun SignUpScreen(onLoginClick: () -> Unit, onSignUpSuccess: () -> Unit) {
                         )
                     }
 
-                    // Create Account Button
                     Button(
-                        onClick = { onSignUpSuccess() },
+                        onClick = { viewModel.handleIntent(SignUpContract.Intent.SignUpClicked) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 20.dp)
                             .height(56.dp),
+                        enabled = !state.isLoading,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = primaryContainerColor,
                             contentColor = onPrimaryContainerColor
                         ),
                         shape = RoundedCornerShape(28.dp)
                     ) {
-                        Text(
-                            text = "CREATE ACCOUNT",
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.25.sp
-                        )
+                        if (state.isLoading) {
+                            CircularProgressIndicator(color = onPrimaryContainerColor, modifier = Modifier.size(24.dp))
+                        } else {
+                            Text(
+                                text = "CREATE ACCOUNT",
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.25.sp
+                            )
+                        }
                     }
                 }
 
-                // Footer
                 Row(
                     modifier = Modifier
                         .padding(top = 32.dp)
@@ -247,13 +249,5 @@ fun SignUpInputField(
             visualTransformation = visualTransformation,
             singleLine = true
         )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun SignUpScreenPreview() {
-    HesabYarTheme {
-        SignUpScreen(onLoginClick = {}, onSignUpSuccess = {})
     }
 }

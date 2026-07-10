@@ -8,26 +8,34 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.hesabyar.ui.components.MainScaffold
-import com.example.hesabyar.ui.theme.HesabYarTheme
 
 @Composable
 fun ProfileScreen(
+    viewModel: ProfileViewModel,
     onDashboardClick: () -> Unit = {},
     onHistoryClick: () -> Unit = {},
     onStatsClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {}
 ) {
+    val state by viewModel.state.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is ProfileContract.Effect.NavigateToLogin -> onLogoutClick()
+            }
+        }
+    }
+
     MainScaffold(
         currentScreen = "profile",
         onDashboardClick = onDashboardClick,
@@ -37,18 +45,20 @@ fun ProfileScreen(
         onAddTransactionClick = { /* TODO */ }
     ) { paddingValues ->
         ProfileContent(
+            state = state,
+            onIntent = { viewModel.handleIntent(it) },
             paddingValues = paddingValues,
-            onSettingsClick = onSettingsClick,
-            onLogoutClick = onLogoutClick
+            onSettingsClick = onSettingsClick
         )
     }
 }
 
 @Composable
 fun ProfileContent(
+    state: ProfileContract.State,
+    onIntent: (ProfileContract.Intent) -> Unit,
     paddingValues: PaddingValues,
-    onSettingsClick: () -> Unit = {},
-    onLogoutClick: () -> Unit = {}
+    onSettingsClick: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -90,13 +100,13 @@ fun ProfileContent(
             }
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                "Amir Mohammad",
+                state.userName,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF071E27)
             )
             Text(
-                "amir.mohammad@example.com",
+                state.userEmail,
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color(0xFF40493D)
             )
@@ -111,12 +121,12 @@ fun ProfileContent(
         ) {
             ProfileStatCard(
                 label = "ACCOUNT TIER",
-                value = "Premium",
+                value = state.accountTier,
                 modifier = Modifier.weight(1f)
             )
             ProfileStatCard(
                 label = "MEMBER SINCE",
-                value = "Jan 2024",
+                value = state.memberSince,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -158,7 +168,7 @@ fun ProfileContent(
 
         // Logout Button
         OutlinedButton(
-            onClick = onLogoutClick,
+            onClick = { onIntent(ProfileContract.Intent.Logout) },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -266,13 +276,5 @@ fun SettingsItem(
                 tint = Color(0xFF40493D)
             )
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun ProfileScreenPreview() {
-    HesabYarTheme {
-        ProfileScreen()
     }
 }

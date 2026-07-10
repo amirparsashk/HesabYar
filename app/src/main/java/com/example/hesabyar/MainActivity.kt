@@ -1,34 +1,44 @@
 package com.example.hesabyar
 
+import android.app.Activity
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import android.app.Activity
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Menu
 import com.example.hesabyar.ui.auth.LoginScreen
+import com.example.hesabyar.ui.auth.LoginViewModel
 import com.example.hesabyar.ui.auth.SignUpScreen
-import com.example.hesabyar.ui.components.MainScaffold
-import com.example.hesabyar.ui.dashboard.DashboardContent
-import com.example.hesabyar.ui.history.HistoryContent
-import com.example.hesabyar.ui.profile.ProfileContent
+import com.example.hesabyar.ui.auth.SignUpViewModel
+import com.example.hesabyar.ui.dashboard.DashboardScreen
+import com.example.hesabyar.ui.dashboard.DashboardViewModel
+import com.example.hesabyar.ui.history.HistoryScreen
+import com.example.hesabyar.ui.history.HistoryViewModel
+import com.example.hesabyar.ui.profile.ProfileScreen
+import com.example.hesabyar.ui.profile.ProfileViewModel
 import com.example.hesabyar.ui.settings.SettingsScreen
-import com.example.hesabyar.ui.stats.StatsContent
-import com.example.hesabyar.ui.transaction.AddTransactionScreen
-import com.example.hesabyar.ui.transaction.TransactionDetailScreen
+import com.example.hesabyar.ui.settings.SettingsViewModel
 import com.example.hesabyar.ui.splash.SplashContract
 import com.example.hesabyar.ui.splash.SplashScreen
 import com.example.hesabyar.ui.splash.SplashViewModel
+import com.example.hesabyar.ui.stats.StatsScreen
+import com.example.hesabyar.ui.stats.StatsViewModel
 import com.example.hesabyar.ui.theme.HesabYarTheme
+import com.example.hesabyar.ui.transaction.AddTransactionScreen
+import com.example.hesabyar.ui.transaction.AddTransactionViewModel
+import com.example.hesabyar.ui.transaction.TransactionDetailScreen
+import com.example.hesabyar.ui.transaction.TransactionDetailViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,8 +51,39 @@ class MainActivity : ComponentActivity() {
                 ) {
                     var currentScreen by remember { mutableStateOf("splash") }
                     var showExitDialog by remember { mutableStateOf(false) }
+                    var selectedTransactionId by remember { mutableLongStateOf(-1L) }
+                    
                     val context = LocalContext.current
+                    val app = context.applicationContext as HesabYarApplication
+                    
                     val splashViewModel: SplashViewModel = viewModel()
+                    val loginViewModel: LoginViewModel = viewModel(factory = object : ViewModelProvider.Factory {
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T = LoginViewModel(app.userRepository) as T
+                    })
+                    val signUpViewModel: SignUpViewModel = viewModel(factory = object : ViewModelProvider.Factory {
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T = SignUpViewModel(app.userRepository) as T
+                    })
+                    val dashboardViewModel: DashboardViewModel = viewModel(factory = object : ViewModelProvider.Factory {
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T = DashboardViewModel(app.financeRepository) as T
+                    })
+                    val historyViewModel: HistoryViewModel = viewModel(factory = object : ViewModelProvider.Factory {
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T = HistoryViewModel(app.financeRepository) as T
+                    })
+                    val statsViewModel: StatsViewModel = viewModel(factory = object : ViewModelProvider.Factory {
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T = StatsViewModel(app.financeRepository) as T
+                    })
+                    val profileViewModel: ProfileViewModel = viewModel(factory = object : ViewModelProvider.Factory {
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T = ProfileViewModel(app.userRepository) as T
+                    })
+                    val settingsViewModel: SettingsViewModel = viewModel(factory = object : ViewModelProvider.Factory {
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T = SettingsViewModel(app.userRepository) as T
+                    })
+                    val addTransactionViewModel: AddTransactionViewModel = viewModel(factory = object : ViewModelProvider.Factory {
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T = AddTransactionViewModel(app.financeRepository) as T
+                    })
+                    val transactionDetailViewModel: TransactionDetailViewModel = viewModel(factory = object : ViewModelProvider.Factory {
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T = TransactionDetailViewModel(app.financeRepository) as T
+                    })
 
                     BackHandler {
                         when (currentScreen) {
@@ -87,95 +128,70 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    val mainScreens = listOf("dashboard", "history", "stats", "profile")
-                    val subScreens = listOf("add_transaction", "settings", "transaction_detail")
-
-                    if (currentScreen in mainScreens || currentScreen in subScreens) {
-                        MainScaffold(
-                            currentScreen = when (currentScreen) {
-                                "settings" -> "profile"
-                                "transaction_detail" -> "history"
-                                else -> if (currentScreen in mainScreens) currentScreen else "dashboard"
-                            },
+                    when (currentScreen) {
+                        "splash" -> SplashScreen(viewModel = splashViewModel)
+                        "login" -> LoginScreen(
+                            viewModel = loginViewModel,
+                            onSignUpClick = { currentScreen = "signup" },
+                            onLoginSuccess = { currentScreen = "dashboard" }
+                        )
+                        "signup" -> SignUpScreen(
+                            viewModel = signUpViewModel,
+                            onLoginClick = { currentScreen = "login" },
+                            onSignUpSuccess = { currentScreen = "dashboard" }
+                        )
+                        "dashboard" -> DashboardScreen(
+                            viewModel = dashboardViewModel,
+                            onAddTransaction = { currentScreen = "add_transaction" },
+                            onNavigateToStats = { currentScreen = "stats" },
+                            onNavigateToHistory = { currentScreen = "history" },
+                            onNavigateToProfile = { currentScreen = "profile" },
+                            onTransactionClick = { id ->
+                                selectedTransactionId = id
+                                currentScreen = "transaction_detail"
+                            }
+                        )
+                        "history" -> HistoryScreen(
+                            viewModel = historyViewModel,
+                            onDashboardClick = { currentScreen = "dashboard" },
+                            onStatsClick = { currentScreen = "stats" },
+                            onProfileClick = { currentScreen = "profile" },
+                            onAddTransaction = { currentScreen = "add_transaction" },
+                            onTransactionClick = { id ->
+                                selectedTransactionId = id
+                                currentScreen = "transaction_detail"
+                            }
+                        )
+                        "stats" -> StatsScreen(
+                            viewModel = statsViewModel,
+                            onDashboardClick = { currentScreen = "dashboard" },
+                            onHistoryClick = { currentScreen = "history" },
+                            onProfileClick = { currentScreen = "profile" },
+                            onAddTransaction = { currentScreen = "add_transaction" }
+                        )
+                        "profile" -> ProfileScreen(
+                            viewModel = profileViewModel,
                             onDashboardClick = { currentScreen = "dashboard" },
                             onHistoryClick = { currentScreen = "history" },
                             onStatsClick = { currentScreen = "stats" },
-                            onProfileClick = { currentScreen = "profile" },
-                            onAddTransactionClick = { currentScreen = "add_transaction" },
-                            showBottomBar = currentScreen in mainScreens,
-                            showFloatingActionButton = currentScreen == "dashboard" || currentScreen == "history",
-                            title = when (currentScreen) {
-                                "dashboard" -> "HesabYar"
-                                "history" -> "History"
-                                "stats" -> "Analytics"
-                                "profile" -> "Profile"
-                                "add_transaction" -> "New Entry"
-                                "settings" -> "Settings"
-                                "transaction_detail" -> "Transaction Details"
-                                else -> "HesabYar"
-                            },
-                            navigationIcon = {
-                                if (currentScreen in subScreens) {
-                                    IconButton(onClick = {
-                                        currentScreen = when (currentScreen) {
-                                            "add_transaction" -> "dashboard"
-                                            "settings" -> "profile"
-                                            "transaction_detail" -> "history"
-                                            else -> "dashboard"
-                                        }
-                                    }) {
-                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                                    }
-                                } else {
-                                    IconButton(onClick = { /* TODO */ }) {
-                                        Icon(Icons.Default.Menu, contentDescription = "Menu")
-                                    }
-                                }
-                            }
-                        ) { paddingValues ->
-                            when (currentScreen) {
-                                "dashboard" -> DashboardContent(
-                                    paddingValues = paddingValues,
-                                    onAddTransaction = { currentScreen = "add_transaction" },
-                                    onTransactionClick = { currentScreen = "transaction_detail" }
-                                )
-                                "history" -> HistoryContent(
-                                    paddingValues = paddingValues,
-                                    onTransactionClick = { currentScreen = "transaction_detail" }
-                                )
-                                "stats" -> StatsContent(paddingValues = paddingValues)
-                                "profile" -> ProfileContent(
-                                    paddingValues = paddingValues,
-                                    onSettingsClick = { currentScreen = "settings" },
-                                    onLogoutClick = { currentScreen = "login" }
-                                )
-                                "add_transaction" -> com.example.hesabyar.ui.transaction.AddTransactionContent(
-                                    paddingValues = paddingValues,
-                                    onBack = { currentScreen = "dashboard" }
-                                )
-                                "settings" -> com.example.hesabyar.ui.settings.SettingsContent(
-                                    paddingValues = paddingValues,
-                                    onLogoutClick = { currentScreen = "login" }
-                                )
-                                "transaction_detail" -> com.example.hesabyar.ui.transaction.TransactionDetailContent(
-                                    paddingValues = paddingValues,
-                                    onEdit = { /* TODO */ },
-                                    onDelete = { /* TODO */ }
-                                )
-                            }
-                        }
-                    } else {
-                        when (currentScreen) {
-                            "splash" -> SplashScreen(viewModel = splashViewModel)
-                            "login" -> LoginScreen(
-                                onSignUpClick = { currentScreen = "signup" },
-                                onLoginSuccess = { currentScreen = "dashboard" }
-                            )
-                            "signup" -> SignUpScreen(
-                                onLoginClick = { currentScreen = "login" },
-                                onSignUpSuccess = { currentScreen = "dashboard" }
-                            )
-                        }
+                            onSettingsClick = { currentScreen = "settings" },
+                            onLogoutClick = { currentScreen = "login" }
+                        )
+                        "add_transaction" -> AddTransactionScreen(
+                            viewModel = addTransactionViewModel,
+                            onBack = { currentScreen = "dashboard" }
+                        )
+                        "settings" -> SettingsScreen(
+                            viewModel = settingsViewModel,
+                            onBack = { currentScreen = "profile" },
+                            onLogoutClick = { currentScreen = "login" }
+                        )
+                        "transaction_detail" -> TransactionDetailScreen(
+                            transactionId = selectedTransactionId,
+                            viewModel = transactionDetailViewModel,
+                            onBack = { currentScreen = "history" },
+                            onEdit = { /* TODO */ }
+                        )
                     }
                 }
             }

@@ -15,16 +15,29 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.hesabyar.ui.theme.HesabYarTheme
+import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTransactionScreen(
+    viewModel: AddTransactionViewModel,
     onBack: () -> Unit
 ) {
+    val state by viewModel.state.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is AddTransactionContract.Effect.NavigateBack -> onBack()
+                is AddTransactionContract.Effect.ShowError -> {
+                    // Show error
+                }
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -52,22 +65,20 @@ fun AddTransactionScreen(
         },
         containerColor = Color(0xFFF3FAFF)
     ) { paddingValues ->
-        AddTransactionContent(paddingValues = paddingValues, onBack = onBack)
+        AddTransactionContent(
+            state = state,
+            onIntent = { viewModel.handleIntent(it) },
+            paddingValues = paddingValues
+        )
     }
 }
 
 @Composable
 fun AddTransactionContent(
-    paddingValues: PaddingValues,
-    onBack: () -> Unit
+    state: AddTransactionContract.State,
+    onIntent: (AddTransactionContract.Intent) -> Unit,
+    paddingValues: PaddingValues
 ) {
-    var transactionType by remember { mutableStateOf("EXPENSE") }
-    var description by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("Shopping") }
-    var date by remember { mutableStateOf("2024-05-26") }
-    var notes by remember { mutableStateOf("") }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -113,14 +124,14 @@ fun AddTransactionContent(
                         .background(Color(0xFFDBF1FE))
                         .padding(4.dp)
                 ) {
-                    val expenseSelected = transactionType == "EXPENSE"
+                    val expenseSelected = state.type == "Expense"
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
                             .clip(RoundedCornerShape(22.dp))
                             .background(if (expenseSelected) Color(0xFFBA1A1A) else Color.Transparent)
-                            .clickable { transactionType = "EXPENSE" },
+                            .clickable { onIntent(AddTransactionContract.Intent.TypeChanged("Expense")) },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -136,7 +147,7 @@ fun AddTransactionContent(
                             .fillMaxHeight()
                             .clip(RoundedCornerShape(22.dp))
                             .background(if (!expenseSelected) Color(0xFF0D631B) else Color.Transparent)
-                            .clickable { transactionType = "INCOME" },
+                            .clickable { onIntent(AddTransactionContract.Intent.TypeChanged("Income")) },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -151,8 +162,8 @@ fun AddTransactionContent(
                 // Description Input
                 InputWrapper(label = "DESCRIPTION") {
                     OutlinedTextField(
-                        value = description,
-                        onValueChange = { description = it },
+                        value = state.title,
+                        onValueChange = { onIntent(AddTransactionContract.Intent.TitleChanged(it)) },
                         placeholder = {
                             Text(
                                 "e.g. Starbucks, Rent, Salary",
@@ -168,8 +179,8 @@ fun AddTransactionContent(
                 // Amount Input
                 InputWrapper(label = "AMOUNT") {
                     OutlinedTextField(
-                        value = amount,
-                        onValueChange = { amount = it },
+                        value = state.amount,
+                        onValueChange = { onIntent(AddTransactionContract.Intent.AmountChanged(it)) },
                         placeholder = {
                             Text(
                                 "0.00",
@@ -197,26 +208,42 @@ fun AddTransactionContent(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     InputWrapper(label = "CATEGORY", modifier = Modifier.weight(1f)) {
-                        OutlinedTextField(
-                            value = category,
-                            onValueChange = { },
-                            readOnly = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            trailingIcon = {
-                                Icon(
-                                    Icons.Default.KeyboardArrowDown,
-                                    contentDescription = null,
-                                    tint = Color(0xFF0D631B)
-                                )
-                            },
-                            colors = textFieldColors()
-                        )
+                        var expanded by remember { mutableStateOf(false) }
+                        Box {
+                            OutlinedTextField(
+                                value = state.categories.find { it.id == state.categoryId }?.name ?: "",
+                                onValueChange = { },
+                                readOnly = true,
+                                modifier = Modifier.fillMaxWidth().clickable { expanded = true },
+                                enabled = false,
+                                shape = RoundedCornerShape(16.dp),
+                                trailingIcon = {
+                                    Icon(
+                                        Icons.Default.KeyboardArrowDown,
+                                        contentDescription = null,
+                                        tint = Color(0xFF0D631B)
+                                    )
+                                },
+                                colors = textFieldColors()
+                            )
+                            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                                state.categories.forEach { category ->
+                                    DropdownMenuItem(
+                                        text = { Text(category.name) },
+                                        onClick = {
+                                            onIntent(AddTransactionContract.Intent.CategorySelected(category.id))
+                                            expanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                     InputWrapper(label = "DATE", modifier = Modifier.weight(1f)) {
                         OutlinedTextField(
-                            value = date,
-                            onValueChange = { date = it },
+                            value = Date(state.date).toString(), // Should use proper formatter
+                            onValueChange = { },
+                            readOnly = true,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
                             trailingIcon = {
@@ -235,8 +262,8 @@ fun AddTransactionContent(
                 // Notes Input
                 InputWrapper(label = "NOTES (OPTIONAL)") {
                     OutlinedTextField(
-                        value = notes,
-                        onValueChange = { notes = it },
+                        value = state.note,
+                        onValueChange = { onIntent(AddTransactionContract.Intent.NoteChanged(it)) },
                         placeholder = {
                             Text(
                                 "Add some details...",
@@ -253,10 +280,11 @@ fun AddTransactionContent(
 
                 // Save Button
                 Button(
-                    onClick = { onBack() },
+                    onClick = { onIntent(AddTransactionContract.Intent.SaveTransaction) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
+                    enabled = !state.isLoading,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF0D631B),
                         contentColor = Color.White
@@ -264,32 +292,13 @@ fun AddTransactionContent(
                     shape = RoundedCornerShape(16.dp),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
                 ) {
-                    Text("SAVE TRANSACTION", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    if (state.isLoading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text("SAVE TRANSACTION", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    }
                 }
             }
-        }
-
-        // Quick Summary Cards
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            SummaryCard(
-                title = "MONTHLY AVG",
-                amount = "$1,240",
-                icon = Icons.Default.Insights,
-                iconColor = Color(0xFF0D631B),
-                containerColor = Color(0xFFDBF1FE),
-                modifier = Modifier.weight(1f)
-            )
-            SummaryCard(
-                title = "PROJECTED",
-                amount = "$4,120",
-                icon = Icons.Default.Savings,
-                iconColor = Color(0xFF2E7238),
-                containerColor = Color(0xFFABF4AC).copy(alpha = 0.3f),
-                modifier = Modifier.weight(1f)
-            )
         }
     }
 }
@@ -319,51 +328,7 @@ private fun textFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedBorderColor = Color(0xFF0D631B),
     unfocusedBorderColor = Color(0xFFDBF1FE),
     focusedLabelColor = Color(0xFF0D631B),
-    unfocusedLabelColor = Color(0xFF40493D)
+    unfocusedLabelColor = Color(0xFF40493D),
+    disabledBorderColor = Color(0xFFDBF1FE),
+    disabledTextColor = Color.Black
 )
-
-@Composable
-fun SummaryCard(
-    title: String,
-    amount: String,
-    icon: ImageVector,
-    iconColor: Color,
-    containerColor: Color,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.aspectRatio(1.2f),
-        color = containerColor,
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, Color(0xFFDBF1FE).copy(alpha = 0.5f))
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(24.dp))
-            Column {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF40493D),
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    amount,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF071E27)
-                )
-            }
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun AddTransactionScreenPreview() {
-    HesabYarTheme {
-        AddTransactionScreen(onBack = {})
-    }
-}
